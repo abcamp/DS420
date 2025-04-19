@@ -1,0 +1,576 @@
+---
+title: "Final Project Title"
+author: "DS 420, Spring 2025"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: cosmo
+    toc: TRUE
+    toc_float: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library("vembedr")
+
+library(rinat)
+library(sf)
+library(tidyverse)
+library(tmap)
+library(leaflet)
+library(osmdata)
+library(plotly)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(rnaturalearthhires)
+library(elevatr)
+library(raster)
+library(ggplot2)
+library(ggforce)
+```
+
+This map represents the final collaborative project for **DS 420: Foundations of Geospatial Thinking**, Chaminade University of Honolulu, Spring 2025.
+
+**Contributors**: Anson Ekau, Faith Hardie, Berylin Lau, Samuel Lee, Cody Tengan.\
+**Instructor**: Amber Camp
+
+# Introduction
+
+The final project for **DS 420: Foundations of Geospatial Thinking** represents the culmination of everything students explored this semester about how maps are made, what they show, and why they matter.
+
+Throughout the course, we investigated the layers and decisions that shape spatial representation, from coordinate systems and data sources to visual encoding and the politics of map design. This final project brings those foundations together in a collaborative mapping effort grounded in place and practice.
+
+Each student contributed a set of geotagged observations using iNaturalist, connecting local data collection with global platforms and citizen science. We then layered those observations with topographic, agricultural, and land use data to explore spatial relationships on the island of Oʻahu.
+
+This page presents a composite map of our findings, not as a final answer, but as a launch point for deeper inquiry into [food systems, land stewardship, and our own roles as mapmakers and data producers].
+
+# Our Story
+
+[**need student contribution here**]
+
+Here is a map of Hawaiʻi, situated in the middle of the Pacific and circled in red.
+
+```{r, include=FALSE}
+world <- ne_countries(scale = "medium", returnclass = "sf")
+class(world)
+
+home <- data.frame(longitude = c(-157.819360), latitude = c(21.293070)) # brute force a df here for fun
+
+```
+
+```{r, echo=FALSE}
+# ggplot(data = world) +
+#   geom_sf(fill = "peachpuff", color = "peachpuff4", size = 0.25) +
+#   geom_sf(data = world, fill = NA, color = "black", size = 0.5) +
+#     coord_sf(crs = "+proj=ortho +lat_0=21 +lon_0=-158 ") +
+#   ggtitle("Hawaiʻi, in the middle of the Pacific Ocean", subtitle = "(Orthographic Azimuthal projection)")+
+#   theme_light() +
+#   geom_point(data = home, aes(x = longitude, y = latitude), size = 18, shape = 1, color = "tomato")
+```
+
+```{r, echo=FALSE}
+# Create a circle background for the globe
+globe_circle <- data.frame(
+  x0 = 0,
+  y0 = 0,
+  r = 6371000  # Radius of Earth in meters
+)
+
+# Create graticule lines as sf
+graticules <- st_graticule(lat = seq(-90, 90, by = 30), lon = seq(-180, 180, by = 30))
+
+ggplot() +
+  # Blue globe background
+  geom_circle(data = globe_circle, aes(x0 = x0, y0 = y0, r = r),
+              fill = "aliceblue", color = "black", linewidth = 0.7) +
+
+  # Land
+  geom_sf(data = world, fill = "peachpuff", color = "peachpuff4", linewidth = 0.25) +
+  geom_sf(data = world, fill = NA, color = "black", linewidth = 0.5) +
+
+  # Graticule lines
+  geom_sf(data = graticules, color = "gray80", linewidth = 0.3) +
+
+  # Home point
+  geom_point(data = home, aes(x = longitude, y = latitude),
+             size = 18, shape = 1, color = "tomato") +
+
+  # Projection
+  coord_sf(crs = "+proj=ortho +lat_0=21 +lon_0=-158", clip = "on") +
+
+  # Theme
+  ggtitle("Hawaiʻi, in the middle of the Pacific Ocean",
+          subtitle = "(Orthographic Azimuthal projection)") +
+  theme_light() +
+  theme(
+    panel.background = element_blank(),
+    panel.grid.major = element_blank()  # now handled by geom_sf layer
+  )
+
+```
+
+And below is a map of the primary islands in the pae ʻāina, or archipelago, of Hawaiʻi. This is what most people envision when they think of Hawaiʻi. Each of the main islands is labeled.
+
+```{r, include=FALSE}
+states <- (ne_states(country = "United States of America"))
+
+hawaii <- states %>%
+  filter(name == "Hawaii")
+
+hawaii_bb <- getbb("Hawaii")
+
+island_names <- data.frame(
+  longitude = c(-156.30228430009103, -158.0451569126879, -159.53108200482657, -155.48811329093772, -157.01795947198627),
+  latitude = c(20.815356749865153, 21.4481296899744, 22.021921415830466, 19.62698703475314, 21.124778646840266),  
+  label = c("Maui", "Oʻahu", "Kauaʻi", "Hawaiʻi", "Molokaʻi"))
+
+island_names2 <- data.frame(
+  longitude = c(-156.92869555180874, -156.61009203954768, -160.13069890462353),
+  latitude = c(20.845258045122367, 20.543357499468808, 21.905594230099855),  
+  label = c("Lānaʻi", "Kahoʻolawe", "Niʻihau"))
+
+```
+
+```{r, echo=FALSE}
+ggplot() +
+    geom_sf(data = world, fill = "white") +
+    geom_sf(data = states, fill = "antiquewhite", size = 0.25) +
+    geom_sf(data = hawaii, fill = "#60C980", color = "#60C980")+
+    geom_label(data = island_names, aes(x = longitude, y = latitude, label = label), size = 2, vjust = -2.5) +
+    geom_label(data = island_names2, aes(x = longitude, y = latitude, label = label), size = 2, vjust = 2.5, hjust = 0.6) +
+    coord_sf(xlim = c(-160.4, -154.7), ylim = c(18.8, 23.1), expand = FALSE) +
+    ylab("Latitude") +
+    xlab("Longitude") +
+    ggtitle("Hawaiʻi", subtitle = "Eight primary islands")+
+    theme_bw() 
+
+```
+
+For the rest of the project, the focus will be on the island of Oʻahu, which encompasses Honolulu County, where we live.
+
+## Topography of Oʻahu
+
+[Need student contribution here]
+
+```{r, include=FALSE}
+bb_oahu <- getbb("Oʻahu")
+
+# ag_land <- bb_oahu %>%
+#   opq() %>%
+#   add_osm_feature(key = "landuse", value = c("farmland", "allotments","aquaculture", "farmyard")) %>%
+#   osmdata_sf()
+
+coastline_oahu <- bb_oahu %>%
+  opq() %>%
+  add_osm_feature(key = "natural", value = "coastline") %>%
+  osmdata_sf()
+
+valleys <- bb_oahu %>%
+  opq() %>%
+  add_osm_feature(key = "natural", value = "valley") %>%
+  osmdata_sf()
+
+rivers <- bb_oahu %>%
+  opq() %>%
+  add_osm_feature(key = "waterway", value = c("river", "stream")) %>%
+  osmdata_sf()
+
+peaks <- bb_oahu %>%
+  opq() %>%
+  add_osm_feature(key = "natural", value = "peak") %>%
+  osmdata_sf()
+
+```
+
+We start with a basic map of our island. From here, we add layers of interest.
+
+```{r, echo=FALSE}
+ggplot() +
+  # geom_sf(data = ag_land$osm_polygons, inherit.aes = FALSE, colour = "cadetblue", fill = "cadetblue", alpha = .5, size = 1) +
+  geom_sf(data = coastline_oahu$osm_lines, inherit.aes = FALSE, color = "black", size = .8, alpha = .5) +
+  geom_sf(data = valleys$osm_lines, inherit.aes = FALSE, color = "black", size = .8, alpha = .5) +
+  coord_sf(xlim = c(-158.28058, -157.64863), ylim = c(21.25482, 21.71201), expand = TRUE) +
+  theme_bw() +
+  labs(
+    title = "Landscape of Oʻahu",
+    x = "Longitude",
+    y = "Latitude"
+  )
+```
+
+```{r include=FALSE}
+# Create bounding box as a data.frame of lat/lon points
+oahu_points <- data.frame(
+  x = c(bb_oahu[1,1], bb_oahu[1,2]),  # xmin, xmax
+  y = c(bb_oahu[2,1], bb_oahu[2,2])   # ymin, ymax
+)
+
+# Fetch a digital elevation model (DEM) for the Oʻahu bounding box
+oahu_elev <- get_elev_raster(
+  locations = oahu_points,
+  z = 8,
+  clip = "bbox",
+  prj = "+proj=longlat +datum=WGS84"
+)
+
+# Convert elevation raster to a data frame for plotting
+elev_df <- as.data.frame(rasterToPoints(oahu_elev))
+colnames(elev_df) <- c("x", "y", "elevation")
+
+contour_lines <- rasterToContour(oahu_elev, nlevels = 10)
+contour_sf <- st_as_sf(contour_lines)
+```
+
+Note to students: I'm including the topography distribution here for you to see, and filtering out anything below zero. Please let me know if you'd like different "breaks" in the manual color grading of the topography of mountains and valleys. This won't be in the final draft.
+
+current breaks: 0, 50, 150, 300, 600, 1200
+
+current colors: "#f7fcf5", "#d9f0d3", "#a1d99b", "#41ab5d", "#006d2c", "#00441b"
+
+[Need descrption of map: The below map shows topography..... What do the colors and lines represent?]
+
+```{r, echo=FALSE}
+
+summary(elev_df$elevation)
+hist(elev_df$elevation, breaks = 30, col = "lightgreen", main = "Oʻahu Elevation Distribution")
+
+elev_df <- elev_df %>%
+  mutate(elevation = ifelse(elevation < 0, NA, elevation))
+
+ggplot() +
+  geom_raster(data = elev_df, aes(x = x, y = y, fill = elevation), alpha = 0.6) +
+  # scale_fill_gradient(low = "gray98", high = "gray70", guide = FALSE) + # auto-grade
+
+  # manual grading
+  scale_fill_gradientn(
+  colours = c("#f7fcf5", "#d9f0d3", "#a1d99b", "#41ab5d", "#006d2c", "#00441b"),
+  values = scales::rescale(c(0, 50, 150, 300, 600, 1200)),  # Adjusted for Oʻahu
+  guide = "none",
+  na.value = "white") +
+  
+  # Coastlines
+  geom_sf(data = coastline_oahu$osm_lines, color = "black", size = 0.8, alpha = 0.7) +
+
+  # Valleys (black paths)
+  geom_sf(data = valleys$osm_lines, color = "black", size = 0.6, alpha = 0.8) +
+  
+  # Contours
+  geom_sf(data = contour_sf, color = "gray50", size = 0.3, alpha = 0.6) +
+  
+  # Rivers
+  geom_sf(data = rivers$osm_lines, color = "skyblue", size = 0.4, alpha = 0.6) +
+
+  # Peaks - removed
+  # geom_sf(data = peaks$osm_points, color = "darkred", shape = 17, size = 2) +
+  # geom_sf_text(data = peaks$osm_points, aes(label = name), size = 2.5, nudge_y = 0.01) +
+
+  coord_sf(xlim = bb_oahu[1,], ylim = bb_oahu[2,]) +
+  theme_bw() +
+  labs(
+    title = "Topography of Oʻahu",
+    subtitle = "Mountains, valleys, and waterways",
+    x = "Longitude",
+    y = "Latitude"
+  )
+
+
+```
+
+[Need description/closing of this section]
+
+## Protected Areas on Oʻahu
+
+This map highlights areas on Oʻahu designated as protected. This data comes from OpenStreetMap, and will include land for national parks, marine protection areas, heritage sites, wilderness, cultural assets, and similar.
+
+```{r, include=FALSE}
+# bb_oahu <- getbb("Oʻahu")
+
+protected <- bb_oahu %>%
+  opq() %>%
+  add_osm_feature(key = "boundary", value = "protected_area") %>%
+  osmdata_sf()
+
+reserves <- bb_oahu %>%
+  opq() %>%
+  add_osm_feature(key = "leisure", value = "nature_reserve") %>%
+  osmdata_sf()
+
+```
+
+```{r, echo=FALSE}
+ggplot() +
+  geom_raster(data = elev_df, aes(x = x, y = y, fill = elevation), alpha = 0.6) +
+  # scale_fill_gradient(low = "gray98", high = "gray70", guide = FALSE) + # auto-grade
+
+  # manual grading
+  scale_fill_gradientn(
+  colours = c("#f7fcf5", "#d9f0d3", "#a1d99b", "#41ab5d", "#006d2c", "#00441b"),
+  values = scales::rescale(c(0, 50, 150, 300, 600, 1200)),  # Adjusted for Oʻahu
+  guide = "none",
+  na.value = "white") +
+  
+  # Coastlines
+  geom_sf(data = coastline_oahu$osm_lines, color = "black", size = 0.8, alpha = 0.7) +
+
+  # Valleys (black paths)
+  geom_sf(data = valleys$osm_lines, color = "black", size = 0.6, alpha = 0.8) +
+  
+  # Contours
+  geom_sf(data = contour_sf, color = "gray50", size = 0.3, alpha = 0.6) +
+  
+  # Rivers
+  geom_sf(data = rivers$osm_lines, color = "skyblue", size = 0.4, alpha = 0.6) +
+
+  # Peaks - removed
+  # geom_sf(data = peaks$osm_points, color = "darkred", shape = 17, size = 2) +
+  # geom_sf_text(data = peaks$osm_points, aes(label = name), size = 2.5, nudge_y = 0.01) +
+
+  # protected and reserve layers
+  geom_sf(data = protected$osm_polygons, inherit.aes = FALSE, colour = "pink", fill = "pink", alpha = .4, size = 1) +
+  geom_sf(data = reserves$osm_polygons, inherit.aes = FALSE, colour = "pink", fill = "pink", alpha = .4, size = 1) +
+  
+  coord_sf(xlim = bb_oahu[1,], ylim = bb_oahu[2,]) +
+  theme_bw() +
+  labs(
+    title = "Protected Areas (pink)",
+    subtitle = "Oʻahu, Hawaiʻi",
+    x = "Longitude",
+    y = "Latitude"
+  )
+```
+
+[Add streets layer. Remove the "small streets"]
+
+This includes: "motorway", "primary", "secondary", "tertiary"
+
+Does not include: "residential", "living_street", "unclassified", "service", "footway"
+
+See <https://wiki.openstreetmap.org/wiki/Map_features>
+
+```{r, include=FALSE}
+streets <- bb_oahu %>%
+  opq() %>%
+  add_osm_feature("highway", c("motorway", "primary", "secondary", "tertiary")) %>%
+  osmdata_sf()
+
+# small_streets <- bb_oahu %>%
+#   opq() %>%
+#   add_osm_feature(key = "highway", value = c("residential", "living_street", "unclassified", "service", "footway")) %>%
+#   osmdata_sf()
+```
+
+```{r, echo=FALSE}
+ggplot() +
+  geom_raster(data = elev_df, aes(x = x, y = y, fill = elevation), alpha = 0.6) +
+  # scale_fill_gradient(low = "gray98", high = "gray70", guide = FALSE) + # auto-grade
+
+  # manual grading
+  scale_fill_gradientn(
+  colours = c("#f7fcf5", "#d9f0d3", "#a1d99b", "#41ab5d", "#006d2c", "#00441b"),
+  values = scales::rescale(c(0, 50, 150, 300, 600, 1200)),  # Adjusted for Oʻahu
+  guide = "none",
+  na.value = "white") +
+  
+  # Coastlines
+  geom_sf(data = coastline_oahu$osm_lines, color = "black", size = 0.8, alpha = 0.7) +
+
+  # Valleys (black paths)
+  geom_sf(data = valleys$osm_lines, color = "black", size = 0.6, alpha = 0.8) +
+  
+  # Contours
+  geom_sf(data = contour_sf, color = "gray50", size = 0.3, alpha = 0.6) +
+  
+  # Rivers
+  geom_sf(data = rivers$osm_lines, color = "skyblue", size = 0.4, alpha = 0.6) +
+
+  # Peaks - removed
+  # geom_sf(data = peaks$osm_points, color = "darkred", shape = 17, size = 2) +
+  # geom_sf_text(data = peaks$osm_points, aes(label = name), size = 2.5, nudge_y = 0.01) +
+
+  # protected and reserve layers
+  geom_sf(data = protected$osm_polygons, inherit.aes = FALSE, colour = "pink", fill = "pink", alpha = .4, size = 1) +
+  geom_sf(data = reserves$osm_polygons, inherit.aes = FALSE, colour = "pink", fill = "pink", alpha = .4, size = 1) +
+  
+  # streets layers
+  geom_sf(data = streets$osm_lines, inherit.aes = FALSE, color = "#ffbe7f", size = .2, alpha = .8) +
+  # geom_sf(data = small_streets$osm_lines, inherit.aes = FALSE, color = "#a6a6a6", size = .2, alpha = .8) +
+  
+  coord_sf(xlim = bb_oahu[1,], ylim = bb_oahu[2,]) +
+  theme_bw() +
+  labs(
+    title = "Need title",
+    subtitle = "need subtitle(?)",
+    x = "Longitude",
+    y = "Latitude"
+  )
+
+```
+
+[Need text]
+
+## Class observations will go here – need title
+
+As part of this final project, each student contributed real-world biodiversity data by submitting geotagged observations through [iNaturalist](https://www.inaturalist.org/), a citizen science platform where people around the world document species they encounter. These contributions served as both a hands-on data collection activity and a way to anchor our spatial analysis in lived, local experience.
+
+Students were asked to observe and submit observations from the areas around them. These observations span a range of locations across Oʻahu, and include both cultivated and wild species. When layered onto our composite map, these data points give us a sense of what kinds of biodiversity exist alongside [agricultural zones, protected lands, and built infrastructure.
+
+While this dataset is small and exploratory, it illustrates a core idea of the course: that geospatial thinking begins with asking questions about the places we inhabit, and that maps can bring together formal and informal knowledge in meaningful ways.
+
+Below is a map of the compiled class observations. (doesn't exit yet–waiting for class contributions)
+
+```{r, include=FALSE}
+# place_id = 1856 # Honolulu County
+# bananas_id = 62911 # taxon id for genus bananas
+# mangos_id = 48875 # taxon id for genus mangifera
+```
+
+```{r, echo=FALSE}
+inat_banana <- get_inat_obs(taxon_id = 62911,
+                            place_id = 1856,
+                            quality = "research",
+                            geo = TRUE,
+                            maxresults = 100)
+
+# save(inat_banana, file = "inat_banana.Rdata")
+
+inat_sf_banana <-  inat_banana %>%
+  dplyr::select(longitude, latitude, datetime, common_name, scientific_name, image_url, user_login) %>%
+  st_as_sf(coords=c("longitude", "latitude"), crs=4326)
+
+dim(inat_sf_banana)
+
+ggplot() +
+  geom_point(data = inat_banana, aes(x = longitude, y = latitude, color = common_name, text = common_name))
+```
+
+And here are our observations plotted as a layer on the map we are building. It is interactive.
+
+NOTE! Using banana data for now. Your data will look different–but think about the plot points and how you'd like them to look.
+
+```{r, echo=FALSE, warning=FALSE}
+p <- ggplot() +
+  geom_raster(data = elev_df, aes(x = x, y = y, fill = elevation), alpha = 0.6) +
+  # scale_fill_gradient(low = "gray98", high = "gray70", guide = FALSE) + # auto-grade
+
+  # manual grading
+  scale_fill_gradientn(
+  colours = c("#f7fcf5", "#d9f0d3", "#a1d99b", "#41ab5d", "#006d2c", "#00441b"),
+  values = scales::rescale(c(0, 50, 150, 300, 600, 1200)),  # Adjusted for Oʻahu
+  guide = "none",
+  na.value = "white") +
+  
+  # Coastlines
+  geom_sf(data = coastline_oahu$osm_lines, color = "black", size = 0.8, alpha = 0.7) +
+
+  # Valleys (black paths)
+  geom_sf(data = valleys$osm_lines, color = "black", size = 0.6, alpha = 0.8) +
+  
+  # Contours
+  geom_sf(data = contour_sf, color = "gray50", size = 0.3, alpha = 0.6) +
+  
+  # Rivers
+  geom_sf(data = rivers$osm_lines, color = "skyblue", size = 0.4, alpha = 0.6) +
+
+  # Peaks - removed
+  # geom_sf(data = peaks$osm_points, color = "darkred", shape = 17, size = 2) +
+  # geom_sf_text(data = peaks$osm_points, aes(label = name), size = 2.5, nudge_y = 0.01) +
+
+  # protected and reserve layers
+  geom_sf(data = protected$osm_polygons, inherit.aes = FALSE, colour = "pink", fill = "pink", alpha = .4, size = 1) +
+  geom_sf(data = reserves$osm_polygons, inherit.aes = FALSE, colour = "pink", fill = "pink", alpha = .4, size = 1) +
+  
+  # streets layers
+  geom_sf(data = streets$osm_lines, inherit.aes = FALSE, color = "#ffbe7f", size = .2, alpha = .8) +
+  # geom_sf(data = small_streets$osm_lines, inherit.aes = FALSE, color = "#a6a6a6", size = .2, alpha = .8) +
+  
+  # iNat data (class set)
+  geom_point(data = inat_banana, aes(x = longitude, y = latitude, color = common_name)) +
+  
+  coord_sf(xlim = bb_oahu[1,], ylim = bb_oahu[2,]) +
+  theme_bw() +
+  labs(
+    title = "Need title",
+    subtitle = "need subtitle(?)",
+    x = "Longitude",
+    y = "Latitude"
+  )
+
+ggplotly(p)
+```
+
+[Need text]
+
+# Takeaways
+
+[Need text]
+
+### Old stuff:
+
+```{r, include=FALSE}
+# inat_obs_popup_sf_banana <- inat_sf_banana %>% 
+#   mutate(popup_html = paste0("<p><b>", common_name, "</b><br/>",
+#                              "<i>", scientific_name, "</i></p>",
+#                              "<p>Observed: ", datetime, "<br/>",
+#                              "User: ", user_login, "</p>",
+#                              "<p><img src='", image_url, "' style='width:100%;'/></p>")
+#   )
+# 
+# htmltools::p("iNaturalist Observations of Bananas on Oʻahu",
+#              htmltools::br(),
+#              inat_obs_popup_sf_banana$datetime %>% 
+#                as.Date() %>% 
+#                range(na.rm = TRUE) %>% 
+#                paste(collapse = " to "),
+#              style = "font-weight:bold; font-size:110%;")
+# 
+# inat_obs_popup_sf_mango <- inat_sf_mango %>% 
+#   mutate(popup_html = paste0("<p><b>", common_name, "</b><br/>",
+#                              "<i>", scientific_name, "</i></p>",
+#                              "<p>Observed: ", datetime, "<br/>",
+#                              "User: ", user_login, "</p>",
+#                              "<p><img src='", image_url, "' style='width:100%;'/></p>")
+#   )
+# 
+# htmltools::p("iNaturalist Observations of Mangos on Oʻahu",
+#              htmltools::br(),
+#              inat_obs_popup_sf_mango$datetime %>% 
+#                as.Date() %>% 
+#                range(na.rm = TRUE) %>% 
+#                paste(collapse = " to "),
+#              style = "font-weight:bold; font-size:110%;")
+# 
+# 
+# ## trying combine the two
+# 
+# combined <- rbind(inat_obs_popup_sf_banana, inat_obs_popup_sf_mango)
+# 
+# combined <- combined %>%
+#     mutate(genus = case_when(
+#       str_starts(scientific_name, "Mu") ~ "Bananas",
+#       str_starts(scientific_name, "Ma") ~ "Mangoes"
+#     ))
+# 
+# color_palette <- colorFactor(c("#ffe135","#FF8040"), domain = combined$genus)
+# 
+# htmltools::p("iNaturalist Observations of Bananas and Mangoes on Oʻahu",
+#              htmltools::br(),
+#              combined$datetime %>% 
+#                as.Date() %>% 
+#                range(na.rm = TRUE) %>% 
+#                paste(collapse = " to "),
+#              style = "font-weight:bold; font-size:110%;")
+
+```
+
+Let's try a different view:
+
+```{r, echo=FALSE}
+# leaflet(combined) %>% 
+#   setView(lng = -157.97675148696226, lat = 21.481260249369335, zoom =10)%>%
+#   addTiles() %>% 
+#   addCircleMarkers(data = combined,
+#                    popup = ~popup_html, 
+#                    radius = 3,
+#                    color = ~color_palette(genus))
+
+```
